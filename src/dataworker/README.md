@@ -76,7 +76,7 @@ These instructions can very easily be modified to conduct an "attack" on Across:
 
 On the other hand, the longer the challenge period, the slower that Across can respond to capital requirements. Across essentially can only move capital around as often as the challenge period, so every two hours currently.
 
-Every two hours, the Dataworker will propose capital reallocation instructions to Across based on the previous two hours' worth of token flows. This is where the concept of "bundle block ranges" comes into play. Each proposed root bundle includes something called the ["bundle evaluation block numbers"](https://github.com/across-protocol/contracts/blob/master/contracts/HubPool.sol#L149). These are included by the Dataworker [at proposal time](https://github.com/across-protocol/contracts/blob/master/contracts/HubPool.sol#L567) and are used by everyone else to validate their proposed Merkle roots.
+Every two hours, the Dataworker will propose capital reallocation instructions to Across based on the previous two hours' worth of token flows. This is where the concept of "bundle block ranges" comes into play. Each proposed root bundle includes something called the ["bundle evaluation block numbers"](https://github.com/across-protocol/contracts/blob/8bef3ca738255ed28b27cb67e9c50bc4357dc868/contracts/HubPool.sol#L150). These are included by the Dataworker [at proposal time](https://github.com/across-protocol/contracts/blob/8bef3ca738255ed28b27cb67e9c50bc4357dc868/contracts/HubPool.sol#L568) and are used by everyone else to validate their proposed Merkle roots.
 
 These end blocks inform all actors which block ranges, per chain, they included Bridge deposit and fill information for to construct their Merkle roots containing instructions for how Across should move capital around.
 
@@ -91,7 +91,7 @@ The implied block range for a chain is simply:
 
 ### `bundleEvaluationBlockNumbers` is an array of numbers, how do you know which chain each block references?
 
-This is why Across must define a canonical "chain ID index" as shown [here](https://github.com/across-protocol/relayer/blob/master/src/common/Constants.ts#L9) which contains an append-only list of chain ID's. This index list is used by an example Dataworker implementation and matches identically the same canonical list defined in the [Across UMIP](https://github.com/UMAprotocol/UMIPs/blob/master/UMIPs/umip-157.md#global-constants).
+This is why Across must define a canonical "chain ID index" as shown [here](https://github.com/across-protocol/relayer/blob/6c506cc38429db71b6e86292895f21f030c6cf6e/src/common/Constants.ts#L5) which contains an append-only list of chain ID's. This index list is used by an example Dataworker implementation and matches identically the same canonical list defined in the [Across UMIP](https://github.com/UMAprotocol/UMIPs/blob/master/UMIPs/umip-157.md#global-constants).
 
 When evaluating a `bundleEvaluationBlockNumbers`, the index of the block number must be matched with the index in the "chain ID index" list to figure out which chain the block number refers to. For example, if the `bundleEvaluationBlockNumbers=[1,2,3,4,5]` and the chain ID index list is `[1,10,137,288,42161]`, then the end block of `2` must be used as the end block in a block range for chain ID `10` (i.e. Optimism).
 
@@ -99,7 +99,7 @@ One assumption in Across, is that each chain that Across supports must have an e
 
 ## Determining bundle start blocks when evaluating a pending root bundle proposal
 
-`B` is trivially known since it is emitted in the [`ProposedRootBundle`](https://github.com/across-protocol/contracts/blob/master/contracts/HubPool.sol#L152) event during the creation of each new pending bundle proposal. We therefore need to find `A`, the bundle start block `<= B` to evaluate the root bundle.
+`B` is trivially known since it is emitted in the [`ProposedRootBundle`](https://github.com/across-protocol/contracts/blob/8bef3ca738255ed28b27cb67e9c50bc4357dc868/contracts/HubPool.sol#L153) event during the creation of each new pending bundle proposal. We therefore need to find `A`, the bundle start block `<= B` to evaluate the root bundle.
 
 ```mermaid
 flowchart LR
@@ -203,13 +203,13 @@ Excesses from slow fills are only created when a partial fill completes a deposi
 
 At this point we have a running balance for the token for each chain. We also know all of the refund and slow fill payments that we need to instruct each SpokePool to reserve payments for. We can finally figure out how many LP funds to send out of the HubPool to each SpokePool.
 
-This is where we'll incorporate the section on [SpokePool targets and thresholds](#spokepool-targets-and-thresholds) to determine how much of the running balances to move over to the `netSendAmount` value in a [PoolRebalanceLeaf](https://github.com/across-protocol/contracts/blob/master/contracts/interfaces/HubPoolInterface.sol#L22). Inside the HubPool's code, only the positive `netSendAmounts` are [sent out of the HubPool](https://github.com/across-protocol/contracts/blob/master/contracts/HubPool.sol#L893) to the SpokePools via the canonical bridges. Conversely, the `runningBalances` are simply accounting values to keep track of the running count of SpokePool balances. Whenever a portion of the `runningBalances` are included in the `netSendAmounts`, the running balances should be decremented accordingly to account for the tokens being sent out of the Hub or SpokePool.
+This is where we'll incorporate the section on [SpokePool targets and thresholds](#spokepool-targets-and-thresholds) to determine how much of the running balances to move over to the `netSendAmount` value in a [PoolRebalanceLeaf](https://github.com/across-protocol/contracts/blob/8bef3ca738255ed28b27cb67e9c50bc4357dc868/contracts/interfaces/HubPoolInterface.sol#L13). Inside the HubPool's code, only the positive `netSendAmounts` are [sent out of the HubPool](https://github.com/across-protocol/contracts/blob/8bef3ca738255ed28b27cb67e9c50bc4357dc868/contracts/HubPool.sol#L901) to the SpokePools via the canonical bridges. Conversely, the `runningBalances` are simply accounting values to keep track of the running count of SpokePool balances. Whenever a portion of the `runningBalances` are included in the `netSendAmounts`, the running balances should be decremented accordingly to account for the tokens being sent out of the Hub or SpokePool.
 
 ## Completing the `RelayerRefundLeaf`
 
 If a `runningBalance` is below its target for a particular chain, the Dataworker might include a positive `netSendAmount` for that chain to instruct the HubPool to send tokens to the SpokePool.
 
-However, if a `runningBalance` is above its target, the Dataworker might want to send tokens from the SpokePool to the Hub. This is achieved by setting a negative `netSendAmount`. At the HubPool level, negative `netSendAmounts` do nothing. However, the `RelayerRefundLeaf` has a property called [`amountToReturn`](https://github.com/across-protocol/contracts/blob/master/contracts/interfaces/SpokePoolInterface.sol#L12) which is supposed to be set equal the negative of any negative `netSendAmounts`. Any positive `amountToReturn` values result in [tokens being sent from the SpokePool](https://github.com/across-protocol/contracts/blob/master/contracts/SpokePool.sol#L923) back to the Hub via the canonical bridge.
+However, if a `runningBalance` is above its target, the Dataworker might want to send tokens from the SpokePool to the Hub. This is achieved by setting a negative `netSendAmount`. At the HubPool level, negative `netSendAmounts` do nothing. However, the `RelayerRefundLeaf` has a property called [`amountToReturn`](https://github.com/across-protocol/contracts/blob/8bef3ca738255ed28b27cb67e9c50bc4357dc868/contracts/interfaces/SpokePoolInterface.sol#L12) which is supposed to be set equal the negative of any negative `netSendAmounts`. Any positive `amountToReturn` values result in [tokens being sent from the SpokePool](https://github.com/across-protocol/contracts/blob/master/contracts/SpokePool.sol#L？不会改) back to the Hub via the canonical bridge.
 
 ## Conclusion
 
