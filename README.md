@@ -115,4 +115,4 @@ We publish pre-releases to signal to users about potential releases that are ris
 
 ### Documenting changes
 
-Every merged PR into `master` should be following the [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) format, as documented in [CONTRIBUTING.md](https://github.com/UMAprotocol/protocol/blob/master/CONTRIBUTING.md).
+Every merged PR into `master` should follow the [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) format, as documented in [CONTRIBUTING.md](https://github.com/UMAprotocol/protocol/blob/master/CONTRIBUTING.md).
